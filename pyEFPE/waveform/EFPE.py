@@ -479,7 +479,7 @@ class pyEFPE:
 		N2ms = self.compute_N2m_exact(N2m_interp_ts_eval_flat, N2m_interp_idxs_flat).reshape(N2m_interp_ts_eval.shape)
 		
 		#obtain the coefficients of the polynomials, choose the same order as the RK, and since modes are smooth functions of e2, we expect the error to be similar to RK error of e2
-		self.N2m_interp_coefs = np.transpose(np.polyfit(N2m_interp_xs, np.transpose(N2ms), self.sol.Qs[0].shape[2]))
+		self.N2m_interp_coefs = np.polyfit(N2m_interp_xs, np.transpose(N2ms), self.sol.Qs[0].shape[2])
 		
 	#function to compute the interpolated newtonian amplitudes
 	def compute_N2m_interpolated(self, times, interp_idxs):
@@ -487,27 +487,18 @@ class pyEFPE:
 		#compute the xs for polinomial interpolation
 		x = (times - self.N2m_interp_ts[interp_idxs])/self.N2m_interp_hs[interp_idxs]
 		
-		#compute the polynomial coeficients
-		coefs = np.transpose(self.N2m_interp_coefs[interp_idxs])
-		
 		#now compute the polynomial using Horners method
-		N2m = coefs[0]
-		for c in coefs[1:]:
-			N2m = c + N2m*x
+		N2m = self.N2m_interp_coefs[0, interp_idxs]
+		for i in range(1, len(self.N2m_interp_coefs)):
+			N2m = self.N2m_interp_coefs[i, interp_idxs] + N2m*x
 		
 		return N2m
 
 	#function to compute the amplitudes given an input array of times
 	def compute_Amplitudes(self, times, m, interp_idxs):
 
-		#compute the newtonian amplitudes
-		N2m = self.compute_N2m(times, interp_idxs)
-
-		#compute precession amplitudes
-		Apc_prec = self.compute_Apc_prec(times, m)
-		
-		#return the mode amplitudes h2m
-		return Apc_prec*N2m[:,np.newaxis]
+		#multiply the precession amplitudes by the Newtonian amplitudes
+		return self.compute_Apc_prec(times, m)*(self.compute_N2m(times, interp_idxs)[:,np.newaxis])
 	
 	#function to compute the amplitudes using the SUA
 	def SUA_Amplitudes(self, times, m, interp_idxs, T_SPA):
@@ -585,4 +576,71 @@ class pyEFPE:
 
 		#now return the result, multiplying by the h0 prefactor and the \sqrt{2\pi} coming from the SPA
 		return (((2*np.pi)**0.5)*self.h0_pref)*waveform
+
+	#method that returns start time of the waveform
+	def return_start_time(self,):
+		return self.sol.all_ts[0]
+
+	#method that returns end time of the waveform
+	def return_end_time(self,):
+		return self.sol.all_ts[-1]
+
+	#Function to compute the time domain waveform polarizations h_{+,\times}(t) given an input array of times (or a time spacing)
+	#When there are many Fourier modes, the computation could be done much more efficiently, since many things, such as v(t) or Apc_prec(t) are the same for all times
+	#Similarly, we could compute phi(t) = n\lambda(t) + (m - n)\delta\lambda(t) without going throught the modes
+	#However, for simplicity, we choose to do things as similarly as possible to the Fourier Domain computation
+	def generate_tdomain_waveform(self, times=None, delta_t=None):
 		
+		#if no time-array is given, create it
+		if times is None:
+			if delta_t is None: raise ValueError("To compute time-domain waveform, please give either an array of times or a time spacing delta_t")
+			#make an equaly spaced array for all available times
+			times = np.arange(self.sol.all_ts[0], self.sol.all_ts[-1], delta_t)
+			#by construction, all times are valid
+			i_valid = np.ones_like(times, dtype=bool)
+			valid_times = times.copy()
+		else:
+			#make sure it is a numpy array
+			times = np.asarray(times)
+			#find valid times (i.e. where the system has been simulated)
+			i_valid = (times>=self.sol.all_ts[0]) & (times<=self.sol.all_ts[-1])
+			valid_times = times[i_valid]
+		
+		#compute length of valid times
+		valid_len = len(valid_times)
+		
+		#find the values of interp_idxs for each time
+		t_idxs, interp_idxs = sorted_vals_in_intervals(valid_times, self.sol.all_ts[self.mode_interp_idx], self.sol.all_ts[self.mode_interp_idx+1])
+		ts_compute = valid_times[t_idxs]
+		del valid_times
+
+		#compute the Amplitudes
+		Amps = self.compute_Amplitudes(ts_compute, self.necessary_modes[interp_idxs,0], interp_idxs)
+		
+		#find segment of Runge-Kutta each interp_idx is in
+		idxs_t_interp = self.mode_interp_idx[interp_idxs]
+		
+		#compute the phases
+		xs = (ts_compute - self.sol.ts[idxs_t_interp])/self.sol.hs[idxs_t_interp]
+		del idxs_t_interp, ts_compute
+		phi_t = xs*self.mode_phases_Qs[0][interp_idxs,-1]
+		for iQ in reversed(range(self.mode_phases_Qs[0].shape[1]-1)):
+			phi_t = xs*(self.mode_phases_Qs[0][interp_idxs,iQ] + phi_t)
+		phi_t+= self.mode_phases_y0[0][interp_idxs]
+		del interp_idxs, xs
+		
+		#compute the waveform h(t) = 2*Re(A(t)*e^{-i\phi(t)})
+		waveform_ts = 2*(Amps.real*(np.cos(phi_t)[:,None]) + Amps.imag*(np.sin(phi_t)[:,None]))
+		del phi_t, Amps
+		
+		#initialize array to store result of adding terms corresponding to same time
+		waveform = np.zeros((2, len(times)), dtype=waveform_ts.dtype)
+
+		#add values of the waveform corresponding to the same time together
+		#Since np.bincount only takes 1D weights, take opportunity to transpose to have correct shape (2, frequencies)
+		for iw in range(len(waveform)):
+			waveform[iw,i_valid] = np.bincount(t_idxs, weights=waveform_ts[:,iw], minlength=valid_len)
+		del waveform_ts, i_valid, t_idxs
+
+		#return polarizations, multiplying by h0 prefactor
+		return self.h0_pref*waveform

@@ -66,19 +66,38 @@ wf = pyEFPE.pyEFPE(params)
 freqs = np.arange(20, 1024, 1/128)
 
 # Compute frequency-domain gravitational wave polarizations
-hp, hc = wf.generate_waveform(freqs)
+hp_fd, hc_fd = wf.generate_waveform(freqs)
 ```
 
-You can visualize this waveform using the following code:
+You can generate a time-domain waveform as in the following example:
+
+```python
+# Define time array for waveform generation
+times = np.arange(wf.return_start_time(), wf.return_end_time(), 1/2048)
+
+# Compute time-domain gravitational wave polarizations
+hp_td, hc_td = wf.generate_tdomain_waveform(times)
+```
+
+You can visualize the waveforms using the following code:
 
 ```python
 from matplotlib import pyplot as plt
 
+# Plot of frequency-domain polarizations
 plt.figure()
-plt.loglog(freqs,  np.abs(hp), 'C0-' , label=r'$|\tilde{h}_+|$')
-plt.loglog(freqs,  np.abs(hc), 'C1-' , label=r'$|\tilde{h}_\times|$')
+plt.loglog(freqs, np.abs(hp_fd), 'C0-', label=r'$|\tilde{h}_+|$')
+plt.loglog(freqs, np.abs(hc_fd), 'C1-', label=r'$|\tilde{h}_\times|$')
 plt.xlabel(r'$f$ [Hz]')
 plt.ylabel(r'Frequency domain strain $[\mathrm{Hz}^{-1}]$')
+plt.legend()
+
+# Plot of time-domain polarizations
+plt.figure()
+plt.plot(times, hp_td, 'C0-', label=r'$h_+$')
+plt.plot(times, hc_td, 'C1-', label=r'$h_\times$')
+plt.xlabel(r'$t$ [s]')
+plt.ylabel(r'Time domain strain')
 plt.legend()
 plt.show()
 ```

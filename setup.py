@@ -13,7 +13,7 @@ except ImportError:
 setup(
     name             = 'pyEFPE',
     description      = 'Python package for an efficient fully precessing eccentric inspiral model.',
-    version          = '0.0',
+    version          = '0.1',
     author           = 'Gonzalo Morrás, Geraint Pratten, Patricia Schmidt',
     author_email     = 'gonzalo.morras@ligo.org',
     packages         = find_packages(),
