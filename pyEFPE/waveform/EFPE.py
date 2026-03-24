@@ -577,6 +577,14 @@ class pyEFPE:
 		#now return the result, multiplying by the h0 prefactor and the \sqrt{2\pi} coming from the SPA
 		return (((2*np.pi)**0.5)*self.h0_pref)*waveform
 
+	#method that returns start time of the waveform
+	def return_start_time(self,):
+		return self.sol.all_ts[0]
+
+	#method that returns end time of the waveform
+	def return_end_time(self,):
+		return self.sol.all_ts[-1]
+
 	#Function to compute the time domain waveform polarizations h_{+,\times}(t) given an input array of times (or a time spacing)
 	#When there are many Fourier modes, the computation could be done much more efficiently, since many things, such as v(t) or Apc_prec(t) are the same for all times
 	#Similarly, we could compute phi(t) = n\lambda(t) + (m - n)\delta\lambda(t) without going throught the modes
