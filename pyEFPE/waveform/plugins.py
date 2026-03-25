@@ -7,16 +7,7 @@ import numpy as np
 # package itself to avoid increasing any install requirements for the 
 # model.
 
-def pycbc_plugin(**parameters):
-    """ Interface for the PyCBC package
-    """
-    # Do imports here to avoid all possibility of circular imports that
-    # could affect the overall package
-    from . import EFPE
-    
-    from pycbc.types import FrequencySeries
-    from pycbc.pnutils import f_SchwarzISCO
-    
+def rename_parameters(parameters):
     # Parameter name conversions, all others passed directly
     # This helps keep a consistent naming convention set for downstream 
     # Where possible, sticking to 
@@ -39,6 +30,18 @@ def pycbc_plugin(**parameters):
         if (old_name in parameters) and (parameters[old_name] is not None)
     }
     parameters.update(renamed_params)
+
+def pycbc_fd_plugin(**parameters):
+    """ Interface for the PyCBC package
+    """
+    # Do imports here to avoid all possibility of circular imports that
+    # could affect the overall package
+    from . import EFPE
+
+    from pycbc.types import FrequencySeries
+    from pycbc.pnutils import f_SchwarzISCO
+
+    rename_parameters(parameters)
     wf = EFPE.pyEFPE(parameters)
     M = parameters['mass1'] + parameters['mass2']
     freqs = np.arange(parameters['f_lower'],
@@ -50,6 +53,25 @@ def pycbc_plugin(**parameters):
 
     tref = - 1.0 / parameters['delta_f']
     hp = FrequencySeries(hp, epoch=tref, delta_f=parameters['delta_f'])
-    hc = FrequencySeries(hp, epoch=tref, delta_f=parameters['delta_f'])
+    hc = FrequencySeries(hc, epoch=tref, delta_f=parameters['delta_f'])
     return hp, hc
     
+
+def pycbc_td_plugin(**parameters):
+    """ Interface for the PyCBC package
+    """
+    # Do imports here to avoid all possibility of circular imports that
+    # could affect the overall package
+    from . import EFPE
+
+    from pycbc.types import TimeSeries
+
+    rename_parameters(parameters)
+    wf = EFPE.pyEFPE(parameters)
+
+    hp, hc = wf.generate_tdomain_waveform(delta_t=parameters["delta_t"])
+
+    tref = - parameters['delta_t']
+    hp = TimeSeries(hp, epoch=tref, delta_t=parameters['delta_t'])
+    hc = TimeSeries(hc, epoch=tref, delta_t=parameters['delta_t'])
+    return hp, hc
