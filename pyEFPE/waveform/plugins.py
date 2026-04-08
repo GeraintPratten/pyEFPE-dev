@@ -51,9 +51,9 @@ def pycbc_fd_plugin(**parameters):
 
     hp, hc = wf.generate_waveform(freqs)
 
-    tref = - 1.0 / parameters['delta_f']
-    hp = FrequencySeries(hp, epoch=tref, delta_f=parameters['delta_f'])
-    hc = FrequencySeries(hc, epoch=tref, delta_f=parameters['delta_f'])
+    epoch = wf.return_start_time()
+    hp = FrequencySeries(hp, epoch=epoch, delta_f=parameters['delta_f'])
+    hc = FrequencySeries(hc, epoch=epoch, delta_f=parameters['delta_f'])
     return hp, hc
     
 
@@ -71,7 +71,7 @@ def pycbc_td_plugin(**parameters):
 
     hp, hc = wf.generate_tdomain_waveform(delta_t=parameters["delta_t"])
 
-    tref = - parameters['delta_t']
-    hp = TimeSeries(hp, epoch=tref, delta_t=parameters['delta_t'])
-    hc = TimeSeries(hc, epoch=tref, delta_t=parameters['delta_t'])
+    epoch = wf.return_start_time()
+    hp = TimeSeries(hp, epoch=epoch, delta_t=parameters['delta_t'])
+    hc = TimeSeries(hc, epoch=epoch, delta_t=parameters['delta_t'])
     return hp, hc
